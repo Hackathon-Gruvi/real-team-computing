@@ -487,8 +487,3 @@ print(run_all_tests("Peter Rabbit", "Peter Rabbit 2: The Runaway", False, 0.25, 
 print(run_all_tests("Full", "Full", False, 0.25, 4))
 print(run_all_tests("Ainbo: Hrdinka pralesa", "Ainbo", False, 0.25, 4))
 """
-
-
-
-
-
