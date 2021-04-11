@@ -6,6 +6,75 @@ from bs4 import BeautifulSoup
 from googlesearch import search
 
 
+def test_len(search, result, tolerance):
+    if tolerance > 1:
+        tolerance = 1
+    if tolerance < 0:
+        tolerance = 0
+    biggest_case = tolerance + 1
+    smallest_case = 1 - tolerance
+    return len(result) <= len(search) * biggest_case and len(result) >= len(search) * smallest_case 
+    
+
+def test_numbers(search, result):
+    snumbers = []
+    rnumbers = []
+    for char in search:
+        if char >= '0' and char <= '9':
+            snumbers.append(char)
+    for char in result:
+        if char >= '0' and char <= '9':
+            rnumbers.append(char)
+    return snumbers == rnumbers
+
+
+def test_words(search, result, minlen):
+    return str_compare_word_match(result, search, minlen) == 1.0
+
+
+def test_exactmatch(search, result):
+    return search == result
+
+def run_all_tests(search, result, fall_back_used, tolerance, minlen):
+    if test_exactmatch(search, result):
+        return "COMP"
+    test_result = "----"
+    if not fall_back_used:
+        test_result = "F---"
+    if test_numbers(search, result):
+        test_result = test_result[0] + "N--"
+    if test_words(search, result, minlen):
+        test_result = test_result[0:2] + "W-"
+    if test_len(search, result, tolerance):
+        test_result = test_result[0:3] + "L"
+    
+    return test_result
+
+
+def test_score_converter(str_test_result):
+    score = 0
+    if str_test_result == "COMP":
+        score = 100
+    else:
+        if str_test_result[0] == 'F':
+            score += 40
+        if str_test_result[1] == 'N':
+            score += 25
+        if str_test_result[2] == 'W':
+            score += 25
+        if str_test_result[3] == 'L':
+            score += 5
+    return score
+
+
+
+def test_compare(test_result, other_test_result):
+    score = test_score_converter(test_result)
+    other_score = test_score_converter(other_test_result)
+    return other_score > score
+    
+
+
 def str_cleaner(dirty_string):
     clean_string = dirty_string.replace(',', '')
     clean_string = clean_string.replace('„', '')
@@ -66,17 +135,23 @@ def word_match(word1, word2):
     return score == 1.0
 
 
-def str_compare_word_match(string1, string2):
+def str_compare_word_match(string1, string2, minlen):
     words1 = string1.split()
     words2 = string2.split()
     score = 0.0
+    counter = 0.0
     for word in words1:
-        for other_word in words2:
-            if word_match(word, other_word):
-                score += 1.0
-                break
+        if len(word) >= minlen:
+            counter += 1.0
+            for other_word in words2:
+                if word_match(word, other_word):
+                    score += 1.0
+                    break
 
-    score = score / len(words1)
+    if counter > 0.0:
+        score = score / counter
+    else:
+        score = 1.0
     return score
 
 
@@ -90,7 +165,7 @@ def concatenate_words(word_list, inf_lim, sup_lim):
     return res
 
 
-def get_imdb_id_duckduckgo_scraping(movie_title):
+def get_imdb_id_duckduckgo_scraping(movie_title, date):
     movie_title = urllib.parse.quote_plus(movie_title)
     query = "https://www.google.pt/search?q=" + \
         movie_title + "+site%3Aimdb.com%2Ftitle"
@@ -101,7 +176,7 @@ def get_imdb_id_duckduckgo_scraping(movie_title):
     return top_result
 
 
-def get_imdb_id_google_api(movie_title):
+def get_imdb_id_google_api(movie_title, date):
     movie_title = urllib.parse.quote_plus(movie_title + " movie")
     key = "AIzaSyDAuCR5quV01QZU0_F0GDx9fYFbs0fIIFI"
     cx = "8b8e8d84ef824d62e"
@@ -120,7 +195,7 @@ def get_imdb_id_google_api(movie_title):
     return movie_id
 
 
-def get_imdb_id_google_scraping(movie_title):
+def get_imdb_id_google_scraping(movie_title, date):
     movie_title = urllib.parse.quote_plus(movie_title)
     query = "https://www.google.com/search?q=" + \
         movie_title + "+site%3Aimdb.com%2Ftitle"
@@ -131,7 +206,7 @@ def get_imdb_id_google_scraping(movie_title):
     return top_result
 
 
-def get_imdb_id_google(movie_title):
+def get_imdb_id_google(movie_title, date):
     query = movie_title + " site:imdb.com"
 
     for j in search(query, tld="com", lang='en', num=1, stop=1):
@@ -145,7 +220,7 @@ def get_imdb_id_google(movie_title):
     return None
 
 
-def get_imdb_id_tmdb_api(movie_title):
+def get_imdb_id_tmdb_api(movie_title, date):
     movie_title = urllib.parse.quote_plus(movie_title)
     api_key = "1aab7ffe316d9a2f462ca84d49d9514c"
     url = "https://api.themoviedb.org/3/search/movie?api_key=" + api_key + \
@@ -173,7 +248,7 @@ def get_imdb_id_tmdb_api(movie_title):
     return movie_id
 
 
-def get_imdb_id_omdb_api(movie_title):
+def get_imdb_id_omdb_api(movie_title, date):
     movie_title = urllib.parse.quote_plus(movie_title)
     apikey = "d05398fd"
     url = "http://www.omdbapi.com/?apikey=" + \
@@ -190,7 +265,7 @@ def get_imdb_id_omdb_api(movie_title):
 
 
 # if date = 1 -> gets the original (older) | if date = 2 -> gets the most recent one | any other date gets the first to appear in the search
-def get_imdb_id(movie_title, date, repeat, tolerance):
+def get_imdb_id(movie_title, date):
     movie_title = str_cleaner(movie_title)
     # print(movie_title)
     og_title = movie_title
@@ -206,74 +281,6 @@ def get_imdb_id(movie_title, date, repeat, tolerance):
     result_table = soup.find('table', {"class": "findList"})
 
     if result_table is None:
-        # print("Another One")
-        if repeat:
-            title_list = og_title.split()
-            title_size = len(title_list)
-            max_cut = (title_size - 1) // 2
-            # print(title_list)
-            imdb_id_list = []
-            scores_list = []
-            for i in range(max_cut):
-                t_first = concatenate_words(title_list, max_cut, title_size)
-                t_last = concatenate_words(title_list, 0, title_size - max_cut)
-                t_both = concatenate_words(
-                    title_list, max_cut, title_size - max_cut)
-                id_first = get_imdb_id(t_first, date, False, tolerance)
-                if id_first is not None:
-                    fscore = str_compare_word_match(
-                        get_title(id_first), t_first)
-                    # print(fscore)
-                    if fscore == 1 or fscore >= tolerance:
-                        return id_first
-                    imdb_id_list.append(id_first)
-                    scores_list.append(fscore)
-                id_last = get_imdb_id(t_last, date, False, tolerance)
-                if id_last is not None:
-                    lscore = str_compare_word_match(get_title(id_last), t_last)
-                    # print(lscore)
-                    if lscore == 1 or lscore >= tolerance:
-                        return id_last
-                    imdb_id_list.append(id_last)
-                    scores_list.append(lscore)
-                id_both = get_imdb_id(t_both, date, False, tolerance)
-                if id_both is not None:
-                    bscore = str_compare_word_match(get_title(id_both), t_both)
-                    # print(bscore)
-                    if bscore == 1 or bscore >= tolerance:
-                        return id_both
-                    imdb_id_list.append(id_both)
-                    scores_list.append(bscore)
-
-            unsure_id = None
-            best_score = -1.0
-            print(imdb_id_list)
-            print(scores_list)
-
-            if len(imdb_id_list) == 0:
-                temp_id = ""
-                temp_score = 0.0
-                for word in title_list:
-                    temp_id = get_imdb_id(word, date, False, tolerance)
-                    if temp_id is not None:
-                        imdb_id_list.append(temp_id)
-                        temp_score = simple_word_compare(
-                            get_title(temp_id), word)
-                        scores_list.append(temp_score)
-                for i in range(len(imdb_id_list)):
-                    print(get_title(imdb_id_list[i]))
-                    if (scores_list[i] > best_score):
-                        best_score = scores_list[i]
-                        unsure_id = imdb_id_list[i]
-                return unsure_id
-            else:
-                for i in range(len(imdb_id_list)):
-                    print(get_title(imdb_id_list[i]))
-                    if (scores_list[i] > best_score):
-                        best_score = scores_list[i]
-                        unsure_id = imdb_id_list[i]
-                return unsure_id
-
         return None
 
     results = result_table.find_all('tr')
@@ -310,8 +317,85 @@ def get_imdb_id(movie_title, date, repeat, tolerance):
     return id
 
 
+
+def despair(get_id, movie_title, date, tolerance):
+    title_list = movie_title.split()
+    title_size = len(title_list)
+    max_cut = (title_size - 1) // 2
+    # print(title_list)
+    imdb_id_list = []
+    scores_list = []
+    for i in range(max_cut):
+        t_first = concatenate_words(title_list, max_cut, title_size)
+        t_last = concatenate_words(title_list, 0, title_size - max_cut)
+        t_both = concatenate_words(title_list, max_cut, title_size - max_cut)
+        id_first = get_id(t_first, date)
+        if id_first is not None:
+            fscore = str_compare_word_match(get_title(id_first), t_first, 0)
+            # print(fscore)
+            if fscore == 1 or fscore >= tolerance:
+                return id_first
+            imdb_id_list.append(id_first)
+            scores_list.append(fscore)
+        id_last = get_id(t_last, date)
+        if id_last is not None:
+            lscore = str_compare_word_match(get_title(id_last), t_last, 0)
+            # print(lscore)
+            if lscore == 1 or lscore >= tolerance:
+                return id_last
+            imdb_id_list.append(id_last)
+            scores_list.append(lscore)
+        id_both = get_id(t_both, date)
+        if id_both is not None:
+            bscore = str_compare_word_match(get_title(id_both), t_both, 0)
+            # print(bscore)
+            if bscore == 1 or bscore >= tolerance:
+                return id_both
+            imdb_id_list.append(id_both)
+            scores_list.append(bscore)
+    unsure_id = None
+    best_score = -1.0
+    #print(imdb_id_list)
+    #print(scores_list)
+    if len(imdb_id_list) == 0:
+        temp_id = ""
+        temp_score = 0.0
+        for word in title_list:
+            temp_id = get_id(word, date)
+            if temp_id is not None:
+                imdb_id_list.append(temp_id)
+                temp_score = simple_word_compare(
+                    get_title(temp_id), word)
+                scores_list.append(temp_score)
+        for i in range(len(imdb_id_list)):
+            #print(get_title(imdb_id_list[i]))
+            if (scores_list[i] > best_score):
+                best_score = scores_list[i]
+                unsure_id = imdb_id_list[i]
+        return unsure_id
+    else:
+        for i in range(len(imdb_id_list)):
+            #print(get_title(imdb_id_list[i]))
+            if (scores_list[i] > best_score):
+                best_score = scores_list[i]
+                unsure_id = imdb_id_list[i]
+        return unsure_id
+
+
+
+def generic_get_id(get_id, fall_back, clean, movie_title, date, tolerance):
+    if clean:
+        movie_title = str_cleaner(movie_title)
+    movie_id = get_id(movie_title, date)
+    if movie_id is None and fall_back:
+        movie_id = despair(get_id, movie_title, date, tolerance)
+    return movie_id
+
+
+
 in_filename = "mismatched_titles_sample.csv"
 out_filename = "matched_titles.csv"
+
 
 with open(in_filename, newline='') as in_file:
     with open(out_filename, 'w', newline='') as out_file:
@@ -319,9 +403,12 @@ with open(in_filename, newline='') as in_file:
         writer = csv.writer(out_file)
         start_time = time.time()
         num_processed = 0
+        date = 0
+        tolerance = 0.75
         for title in reader:
             print("Processing title " + title[0])
-            writer.writerow([get_imdb_id_omdb_api(title[0]), title[0]])
+            movie_id = generic_get_id(get_imdb_id_google, True, True, title[0], date, tolerance)
+            writer.writerow([movie_id, title[0]])
             num_processed += 1
         end_time = time.time()
         elapsed_time = end_time - start_time
@@ -329,7 +416,24 @@ with open(in_filename, newline='') as in_file:
         print("Processed " + str(num_processed) + "titles in " +
               str(elapsed_time) + "s" + "(average " + str(avg_time) + "s/title)")
 
+
+
+
+
 print("Resulting matches saved to " + out_filename)
 
 
-# print(get_imdb_id_google_scraping("The Lion King"))
+"""
+print(run_all_tests("F9 Fast and Furious 9", "F9", False, 0.25, 4))
+print(run_all_tests("Marvel Black Widow", "Black Widow", False, 0.25, 4))
+print(run_all_tests("KÃTYRIT: GRUN TARINA", "Gru o Maldisposto 2", False, 0.25, 4))
+print(run_all_tests("Tom y Jerry", "Tom & Jerry", False, 0.25, 4))
+print(run_all_tests("Peter Rabbit", "Peter Rabbit 2: The Runaway", False, 0.25, 4))
+print(run_all_tests("Full", "Full", False, 0.25, 4))
+print(run_all_tests("Ainbo: Hrdinka pralesa", "Ainbo", False, 0.25, 4))
+"""
+
+
+
+
+
