@@ -429,7 +429,7 @@ result = loop.run_until_complete(future)
 end_time = time.time()
 elapsed_time = end_time - start_time
 avg_time = elapsed_time/len(titles)
-print("Processed " + str(len(titles)) + "titles in " +
+print("Processed " + str(len(titles)) + " titles in " +
       str(elapsed_time) + "s" + "(average " + str(avg_time) + "s/title)")
 results = []
 results.append(result[:len(titles)])
