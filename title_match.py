@@ -1,9 +1,11 @@
 import requests
-import csv
-import urllib
-import time
 from bs4 import BeautifulSoup
+import urllib
+import csv
 from googlesearch import search
+import time
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 
 def test_len(search, result, tolerance):
@@ -51,34 +53,6 @@ def run_all_tests(search, result, fall_back_used, tolerance, minlen):
     return test_result
 
 
-def get_title(imdb_id):
-    query = "https://www.imdb.com/title/" + imdb_id
-    html_text = requests.get(query, headers={"accept-language": "en-US"}).text
-    soup = BeautifulSoup(html_text, 'html.parser')
-    # title = soup.find_all('title', limit=1)
-    title_words = soup.title.contents[0].split()
-    # year = int(title_words[-3][1:-1])
-    title = ""
-    for i in range(len(title_words) - 3):
-        if(i == 0):
-            title += title_words[i]
-        else:
-            title += " " + title_words[i]
-    # print(year)
-    # print(title)
-    # print(title_words)
-
-    return title
-
-
-
-def run_all_tests_id(search, result_id, fall_back_used, tolerance, minlen):
-    result_title = get_title(result_id)
-    run_all_tests(search, result_title, fall_back_used, tolerance, minlen)
-    
-    
-
-
 def test_score_converter(str_test_result):
     score = 0
     if str_test_result == "COMP":
@@ -107,6 +81,33 @@ def str_cleaner(dirty_string):
     clean_string = dirty_string.replace(',', '')
     clean_string = clean_string.replace('„', '')
     return clean_string
+
+
+def get_title(imdb_id):
+    query = "https://www.imdb.com/title/" + imdb_id
+    html_text = requests.get(query, headers={"accept-language": "en-US"}).text
+    soup = BeautifulSoup(html_text, 'html.parser')
+    # title = soup.find_all('title', limit=1)
+    title_words = soup.title.contents[0].split()
+    # year = int(title_words[-3][1:-1])
+    title = ""
+    for i in range(len(title_words) - 3):
+        if(i == 0):
+            title += title_words[i]
+        else:
+            title += " " + title_words[i]
+    # print(year)
+    # print(title)
+    # print(title_words)
+
+    return title
+
+
+
+def run_all_tests_id(search, result_id, fall_back_used, tolerance, minlen):
+    result_title = get_title(result_id)
+    run_all_tests(search, result_title, fall_back_used, tolerance, minlen)
+
 
 
 def simple_word_compare(word1, word2):
@@ -172,7 +173,7 @@ def concatenate_words(word_list, inf_lim, sup_lim):
             res += " " + word_list[i]
     return res
 
-
+# NOT IN USE AND NOT DONE
 def get_imdb_id_duckduckgo_scraping(movie_title, date):
     movie_title = urllib.parse.quote_plus(movie_title)
     query = "https://www.google.pt/search?q=" + \
@@ -184,7 +185,7 @@ def get_imdb_id_duckduckgo_scraping(movie_title, date):
     return top_result
 
 
-def get_imdb_id_google_api(movie_title, date):
+def get_imdb_id_google_api(movie_title, date=0):
     movie_title = urllib.parse.quote_plus(movie_title + " movie")
     key = "AIzaSyDAuCR5quV01QZU0_F0GDx9fYFbs0fIIFI"
     cx = "8b8e8d84ef824d62e"
@@ -202,8 +203,8 @@ def get_imdb_id_google_api(movie_title, date):
     movie_id = movie_id[:movie_id.find("/")]
     return movie_id
 
-
-def get_imdb_id_google_scraping(movie_title, date):
+# NOT IN USE AND NOT DONE
+def get_imdb_id_google_scraping(movie_title, date=0):
     movie_title = urllib.parse.quote_plus(movie_title)
     query = "https://www.google.com/search?q=" + \
         movie_title + "+site%3Aimdb.com%2Ftitle"
@@ -213,7 +214,7 @@ def get_imdb_id_google_scraping(movie_title, date):
     top_result = soup.body.find('div', {"class": "g"})
     return top_result
 
-
+# NOT IN USE
 def get_imdb_id_google(movie_title, date):
     query = movie_title + " site:imdb.com"
 
@@ -228,7 +229,7 @@ def get_imdb_id_google(movie_title, date):
     return None
 
 
-def get_imdb_id_tmdb_api(movie_title, date):
+def get_imdb_id_tmdb_api(movie_title, date=0):
     movie_title = urllib.parse.quote_plus(movie_title)
     api_key = "1aab7ffe316d9a2f462ca84d49d9514c"
     url = "https://api.themoviedb.org/3/search/movie?api_key=" + api_key + \
@@ -256,7 +257,7 @@ def get_imdb_id_tmdb_api(movie_title, date):
     return movie_id
 
 
-def get_imdb_id_omdb_api(movie_title, date):
+def get_imdb_id_omdb_api(movie_title, date=0):
     movie_title = urllib.parse.quote_plus(movie_title)
     apikey = "d05398fd"
     url = "http://www.omdbapi.com/?apikey=" + \
@@ -273,7 +274,7 @@ def get_imdb_id_omdb_api(movie_title, date):
 
 
 # if date = 1 -> gets the original (older) | if date = 2 -> gets the most recent one | any other date gets the first to appear in the search
-def get_imdb_id(movie_title, date):
+def get_imdb_id_imdb(movie_title, date=0):
     movie_title = str_cleaner(movie_title)
     # print(movie_title)
     movie_title = urllib.parse.quote_plus(movie_title)
@@ -324,8 +325,7 @@ def get_imdb_id(movie_title, date):
     return id
 
 
-
-def despair(get_id, movie_title, date, tolerance):
+def despair(get_id, movie_title, date=0, tolerance=0.75):
     title_list = movie_title.split()
     title_size = len(title_list)
     max_cut = (title_size - 1) // 2
@@ -389,8 +389,7 @@ def despair(get_id, movie_title, date, tolerance):
         return unsure_id
 
 
-
-def generic_get_id(get_id, fall_back, clean, movie_title, date, tolerance):
+def generic_get_id(get_id, fall_back, clean, movie_title, date=0, tolerance=0.75):
     if clean:
         movie_title = str_cleaner(movie_title)
     movie_id = get_id(movie_title, date)
@@ -399,36 +398,85 @@ def generic_get_id(get_id, fall_back, clean, movie_title, date, tolerance):
     return movie_id
 
 
+def get_titles_from_csv(in_filename):
+    titles = []
+    with open(in_filename, newline='') as in_file:
+        reader = csv.reader(in_file)
+        for title in reader:
+            titles.append(title[0])
+    return titles
 
 in_filename = "mismatched_titles_sample.csv"
 out_filename = "matched_titles.csv"
 
+async def get_ids_asynchronous(titles):
+    with ThreadPoolExecutor(max_workers=50) as executor:
+        loop = asyncio.get_event_loop()
 
-with open(in_filename, newline='') as in_file:
-    with open(out_filename, 'w', newline='') as out_file:
-        reader = csv.reader(in_file)
-        writer = csv.writer(out_file)
-        start_time = time.time()
-        num_processed = 0
-        date = 0
+        date = 2
         tolerance = 0.75
-        for title in reader:
-            print("Processing title " + title[0])
-            movie_id = generic_get_id(get_imdb_id_google, True, True, title[0], date, tolerance)
-            writer.writerow([movie_id, title[0]])
-            num_processed += 1
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        avg_time = elapsed_time/num_processed
-        print("Processed " + str(num_processed) + "titles in " +
-              str(elapsed_time) + "s" + "(average " + str(avg_time) + "s/title)")
+        tasks = []
+        for i in range(len(titles)):
+            tasks.append(loop.run_in_executor(executor, generic_get_id, *(get_imdb_id_imdb, True, True, titles[i], date, tolerance)))
+        for i in range(len(titles)):
+            tasks.append(loop.run_in_executor(executor, generic_get_id, *(get_imdb_id_google_api, True, True, titles[i], date, tolerance)))
+        for i in range(len(titles)):
+            tasks.append(loop.run_in_executor(executor, generic_get_id, *(get_imdb_id_tmdb_api, True, True, titles[i], date, tolerance)))
+        for i in range(len(titles)):
+            tasks.append(loop.run_in_executor(executor, generic_get_id, *(get_imdb_id_omdb_api, True, True, titles[i], date, tolerance)))
+        return await asyncio.gather(*tasks)
 
+titles = get_titles_from_csv(in_filename)
+loop = asyncio.get_event_loop()
+print("Processing titles ...")
+start_time = time.time()
+future = asyncio.ensure_future(get_ids_asynchronous(titles))
+result = loop.run_until_complete(future)
+end_time = time.time()
+elapsed_time = end_time - start_time
+avg_time = elapsed_time/len(titles)
+print("Processed " + str(len(titles)) + " titles in " +
+      str(elapsed_time) + "s" + "(average " + str(avg_time) + "s/title)")
+results = []
+results.append(result[:len(titles)])
+results.append(result[len(titles):2*len(titles)])
+results.append(result[2*len(titles):3*len(titles)])
+results.append(result[3*len(titles):4*len(titles)])
 
-
-
+with open(out_filename, 'w', newline='') as out_file:
+    writer = csv.writer(out_file)
+    start_time = time.time()
+    date = 2
+    tolerance = 0.75
+    writer.writerow(["Title", "IMDb", "Google", "TMDB", "OMDb"])
+    for i in range(len(titles)):
+        writer.writerow([titles[i], results[0][i], results[1][i], results[2][i], results[3][i]])
 
 print("Resulting matches saved to " + out_filename)
 
+"""
+#Synchronous version
+with open(out_filename, 'w', newline='') as out_file:
+    writer = csv.writer(out_file)
+    start_time = time.time()
+    date = 2
+    tolerance = 0.75
+    writer.writerow(["Title", "IMDb", "Google", "TMDB", "OMDb"])
+    for title in titles:
+        print("Processing title " + title)
+        movie_id_imdb = generic_get_id(get_imdb_id_imdb, True, True, title, date, tolerance)
+        movie_id_google = generic_get_id(get_imdb_id_google_api, True, True, title, date, tolerance)
+        movie_id_tmdb = generic_get_id(get_imdb_id_tmdb_api, True, True, title, date, tolerance)
+        movie_id_omdb = generic_get_id(get_imdb_id_omdb_api, True, True, title, date, tolerance)
+        writer.writerow([title, movie_id_imdb, movie_id_google, movie_id_tmdb, movie_id_omdb])
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    avg_time = elapsed_time/len(titles)
+    print("Processed " + str(len(titles)) + "titles in " +
+            str(elapsed_time) + "s" + "(average " + str(avg_time) + "s/title)")
+
+print("Resulting matches saved to " + out_filename)
+"""
 
 """
 print(run_all_tests("F9 Fast and Furious 9", "F9", False, 0.25, 4))
@@ -439,6 +487,8 @@ print(run_all_tests("Peter Rabbit", "Peter Rabbit 2: The Runaway", False, 0.25, 
 print(run_all_tests("Full", "Full", False, 0.25, 4))
 print(run_all_tests("Ainbo: Hrdinka pralesa", "Ainbo", False, 0.25, 4))
 """
+
+
 
 
 
