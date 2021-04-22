@@ -6,6 +6,7 @@ from googlesearch import search
 import time
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import config
 
 
 def test_len(search, result, tolerance):
@@ -15,8 +16,8 @@ def test_len(search, result, tolerance):
         tolerance = 0
     biggest_case = tolerance + 1
     smallest_case = 1 - tolerance
-    return len(result) <= len(search) * biggest_case and len(result) >= len(search) * smallest_case 
-    
+    return len(result) <= len(search) * biggest_case and len(result) >= len(search) * smallest_case
+
 
 def test_numbers(search, result):
     snumbers = []
@@ -37,6 +38,7 @@ def test_words(search, result, minlen):
 def test_exactmatch(search, result):
     return search == result
 
+
 def run_all_tests(search, result, fall_back_used, tolerance, minlen):
     if test_exactmatch(search, result):
         return "COMP"
@@ -49,7 +51,7 @@ def run_all_tests(search, result, fall_back_used, tolerance, minlen):
         test_result = test_result[0:2] + "W-"
     if test_len(search, result, tolerance):
         test_result = test_result[0:3] + "L"
-    
+
     return test_result
 
 
@@ -69,12 +71,10 @@ def test_score_converter(str_test_result):
     return score
 
 
-
 def test_compare(test_result, other_test_result):
     score = test_score_converter(test_result)
     other_score = test_score_converter(other_test_result)
     return other_score > score
-    
 
 
 def str_cleaner(dirty_string):
@@ -103,11 +103,9 @@ def get_title(imdb_id):
     return title
 
 
-
 def run_all_tests_id(search, result_id, fall_back_used, tolerance, minlen):
     result_title = get_title(result_id)
     run_all_tests(search, result_title, fall_back_used, tolerance, minlen)
-
 
 
 def simple_word_compare(word1, word2):
@@ -174,6 +172,8 @@ def concatenate_words(word_list, inf_lim, sup_lim):
     return res
 
 # NOT IN USE AND NOT DONE
+
+
 def get_imdb_id_duckduckgo_scraping(movie_title, date):
     movie_title = urllib.parse.quote_plus(movie_title)
     query = "https://www.google.pt/search?q=" + \
@@ -187,10 +187,9 @@ def get_imdb_id_duckduckgo_scraping(movie_title, date):
 
 def get_imdb_id_google_api(movie_title, date=0):
     movie_title = urllib.parse.quote_plus(movie_title + " movie")
-    key = "AIzaSyDAuCR5quV01QZU0_F0GDx9fYFbs0fIIFI"
     cx = "8b8e8d84ef824d62e"
     url = "https://www.googleapis.com/customsearch/v1/siterestrict?key=" + \
-        key + "&cx=" + cx + "&q=" + movie_title + "&num=1"
+        config.google_api_key + "&cx=" + cx + "&q=" + movie_title + "&num=1"
     response = requests.get(url)
     if response.status_code != 200:
         print("HTTP Status " + str(response.status_code))
@@ -204,6 +203,8 @@ def get_imdb_id_google_api(movie_title, date=0):
     return movie_id
 
 # NOT IN USE AND NOT DONE
+
+
 def get_imdb_id_google_scraping(movie_title, date=0):
     movie_title = urllib.parse.quote_plus(movie_title)
     query = "https://www.google.com/search?q=" + \
@@ -215,6 +216,8 @@ def get_imdb_id_google_scraping(movie_title, date=0):
     return top_result
 
 # NOT IN USE
+
+
 def get_imdb_id_google(movie_title, date):
     query = movie_title + " site:imdb.com"
 
@@ -231,8 +234,7 @@ def get_imdb_id_google(movie_title, date):
 
 def get_imdb_id_tmdb_api(movie_title, date=0):
     movie_title = urllib.parse.quote_plus(movie_title)
-    api_key = "1aab7ffe316d9a2f462ca84d49d9514c"
-    url = "https://api.themoviedb.org/3/search/movie?api_key=" + api_key + \
+    url = "https://api.themoviedb.org/3/search/movie?api_key=" + config.tmdb_api_key + \
         "&language=en-US&query=" + movie_title + "&page=1&include_adult=true"
     response = requests.get(url)
     if response.status_code != 200:
@@ -244,7 +246,7 @@ def get_imdb_id_tmdb_api(movie_title, date=0):
     movie_id = result["results"][0]["id"]
 
     url = "https://api.themoviedb.org/3/movie/" + \
-        str(movie_id) + "/external_ids?api_key=" + api_key
+        str(movie_id) + "/external_ids?api_key=" + config.tmdb_api_key
     response = requests.get(url)
     if response.status_code != 200:
         print("HTTP Status " + str(response.status_code))
@@ -259,9 +261,8 @@ def get_imdb_id_tmdb_api(movie_title, date=0):
 
 def get_imdb_id_omdb_api(movie_title, date=0):
     movie_title = urllib.parse.quote_plus(movie_title)
-    apikey = "d05398fd"
     url = "http://www.omdbapi.com/?apikey=" + \
-        apikey + "&s=" + movie_title + "&type=movie"
+        config.omdb_api_key + "&s=" + movie_title + "&type=movie"
     response = requests.get(url)
     if response.status_code != 200:
         print("HTTP Status " + str(response.status_code))
@@ -406,8 +407,10 @@ def get_titles_from_csv(in_filename):
             titles.append(title[0])
     return titles
 
+
 in_filename = "mismatched_titles_sample.csv"
 out_filename = "matched_titles.csv"
+
 
 async def get_ids_asynchronous(titles):
     with ThreadPoolExecutor(max_workers=50) as executor:
@@ -417,13 +420,17 @@ async def get_ids_asynchronous(titles):
         tolerance = 0.75
         tasks = []
         for i in range(len(titles)):
-            tasks.append(loop.run_in_executor(executor, generic_get_id, *(get_imdb_id_imdb, True, True, titles[i], date, tolerance)))
+            tasks.append(loop.run_in_executor(executor, generic_get_id,
+                         *(get_imdb_id_imdb, True, True, titles[i], date, tolerance)))
         for i in range(len(titles)):
-            tasks.append(loop.run_in_executor(executor, generic_get_id, *(get_imdb_id_google_api, True, True, titles[i], date, tolerance)))
+            tasks.append(loop.run_in_executor(executor, generic_get_id, *
+                         (get_imdb_id_google_api, True, True, titles[i], date, tolerance)))
         for i in range(len(titles)):
-            tasks.append(loop.run_in_executor(executor, generic_get_id, *(get_imdb_id_tmdb_api, True, True, titles[i], date, tolerance)))
+            tasks.append(loop.run_in_executor(executor, generic_get_id, *
+                         (get_imdb_id_tmdb_api, True, True, titles[i], date, tolerance)))
         for i in range(len(titles)):
-            tasks.append(loop.run_in_executor(executor, generic_get_id, *(get_imdb_id_omdb_api, True, True, titles[i], date, tolerance)))
+            tasks.append(loop.run_in_executor(executor, generic_get_id, *
+                         (get_imdb_id_omdb_api, True, True, titles[i], date, tolerance)))
         return await asyncio.gather(*tasks)
 
 titles = get_titles_from_csv(in_filename)
@@ -450,7 +457,8 @@ with open(out_filename, 'w', newline='') as out_file:
     tolerance = 0.75
     writer.writerow(["Title", "IMDb", "Google", "TMDB", "OMDb"])
     for i in range(len(titles)):
-        writer.writerow([titles[i], results[0][i], results[1][i], results[2][i], results[3][i]])
+        writer.writerow([titles[i], results[0][i], results[1]
+                        [i], results[2][i], results[3][i]])
 
 print("Resulting matches saved to " + out_filename)
 
